@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+*.log
+frontend/.buildozer/
+frontend/bin/
+backend2/data/
+shadow_memory.db
