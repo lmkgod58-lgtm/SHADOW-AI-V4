@@ -1,0 +1,65 @@
+name: Build Shadow AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Buildozer downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.buildozer
+            ~/.buildozer
+          key: shadow-ai-buildozer-${{ runner.os }}-${{ hashFiles('frontend/buildozer.spec') }}
+          restore-keys: |
+            shadow-ai-buildozer-${{ runner.os }}-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip python3-venv git zip unzip \
+            openjdk-17-jdk autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libffi-dev libssl-dev \
+            cmake libsqlite3-dev libltdl-dev
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install buildozer cython==0.29.33 kivy==2.3.0
+
+      - name: Build APK with retry for transient downloads
+        working-directory: frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3; do
+            echo "Build attempt $attempt/3"
+            if yes | buildozer android debug; then
+              exit 0
+            fi
+            echo "Build failed. Waiting before retry..."
+            sleep 20
+          done
+          exit 1
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-ai-debug-apk
+          path: frontend/bin/*.apk
